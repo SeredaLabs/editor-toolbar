@@ -4,6 +4,10 @@
   "description": "%description%",
   "version": "1.0.0",
   "publisher": "seredalabs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SeredaLabs/editor-toolbar.git"
+  },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
   "keywords": ["toolbar", "bookmarks", "format", "fold", "1C", "BSL", "navigation"],
