@@ -1,0 +1,62 @@
+{
+  "name": "editor-toolbar",
+  "displayName": "%displayName%",
+  "description": "%description%",
+  "version": "1.0.0",
+  "publisher": "seredalabs",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["toolbar", "bookmarks", "format", "fold", "1C", "BSL", "navigation"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./src/extension.js",
+  "icon": "images/icon.png",
+  "contributes": {
+    "commands": [
+      { "command": "editorToolbar.addBookmark",      "title": "%cmd.addBookmark%",      "category": "Editor Toolbar" },
+      { "command": "editorToolbar.prevBookmark",     "title": "%cmd.prevBookmark%",     "category": "Editor Toolbar" },
+      { "command": "editorToolbar.nextBookmark",     "title": "%cmd.nextBookmark%",     "category": "Editor Toolbar" },
+      { "command": "editorToolbar.listBookmarks",    "title": "%cmd.listBookmarks%",    "category": "Editor Toolbar" },
+      { "command": "editorToolbar.formatDocument",   "title": "%cmd.formatDocument%",   "category": "Editor Toolbar" },
+      { "command": "editorToolbar.toggleComment",    "title": "%cmd.toggleComment%",    "category": "Editor Toolbar" },
+      { "command": "editorToolbar.openSettings",     "title": "%cmd.openSettings%",     "category": "Editor Toolbar" },
+      { "command": "editorToolbar.showFunctionList", "title": "%cmd.showFunctionList%", "category": "Editor Toolbar", "icon": "$(list-flat)" },
+      { "command": "editorToolbar.foldAll",          "title": "%cmd.foldAll%",          "category": "Editor Toolbar", "icon": "$(collapse-all)" },
+      { "command": "editorToolbar.unfoldAll",        "title": "%cmd.unfoldAll%",        "category": "Editor Toolbar", "icon": "$(expand-all)" }
+    ],
+    "menus": {
+      "editor/title": [
+        { "command": "editorToolbar.showFunctionList", "group": "navigation@1", "when": "editorLangId != '' && resourceScheme == 'file'" },
+        { "command": "editorToolbar.foldAll",          "group": "navigation@2", "when": "editorLangId != '' && resourceScheme == 'file'" },
+        { "command": "editorToolbar.unfoldAll",        "group": "navigation@3", "when": "editorLangId != '' && resourceScheme == 'file'" }
+      ]
+    },
+    "keybindings": [
+      { "command": "editorToolbar.addBookmark",      "key": "ctrl+f2",      "when": "editorTextFocus" },
+      { "command": "editorToolbar.nextBookmark",     "key": "f2",           "when": "editorTextFocus" },
+      { "command": "editorToolbar.prevBookmark",     "key": "shift+f2",     "when": "editorTextFocus" },
+      { "command": "editorToolbar.listBookmarks",    "key": "ctrl+alt+f2", "when": "editorTextFocus" },
+      { "command": "editorToolbar.toggleComment",    "key": "ctrl+/",       "when": "editorTextFocus" },
+      { "command": "editorToolbar.showFunctionList", "key": "ctrl+alt+o",   "when": "editorTextFocus" },
+      { "command": "editorToolbar.foldAll",          "key": "ctrl+shift+[", "when": "editorTextFocus" },
+      { "command": "editorToolbar.unfoldAll",        "key": "ctrl+shift+]", "when": "editorTextFocus" }
+    ],
+    "configuration": {
+      "title": "%config.title%",
+      "properties": {
+        "editorToolbar.customPatterns": {
+          "type": "array",
+          "default": [],
+          "description": "%config.customPatterns%",
+          "scope": "resource"
+        },
+        "editorToolbar.bookmarkColor": {
+          "type": "string",
+          "default": "#ff6b35",
+          "description": "%config.bookmarkColor%",
+          "scope": "resource"
+        }
+      }
+    }
+  },
+  "license": "MIT"
+}

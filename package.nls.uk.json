@@ -1,0 +1,17 @@
+{
+  "displayName": "Editor Toolbar",
+  "description": "Закладки, форматування, коментування та навігація по функціях для будь-якої мови",
+  "cmd.addBookmark":      "Встановити/зняти закладку",
+  "cmd.prevBookmark":     "Попередня закладка",
+  "cmd.nextBookmark":     "Наступна закладка",
+  "cmd.listBookmarks":    "Список закладок",
+  "cmd.formatDocument":   "Форматувати документ",
+  "cmd.toggleComment":    "Рядковий коментар",
+  "cmd.openSettings":     "Налаштування",
+  "cmd.showFunctionList": "Функції та процедури",
+  "cmd.foldAll":          "Згорнути все",
+  "cmd.unfoldAll":        "Розгорнути все",
+  "config.title":             "Editor Toolbar",
+  "config.customPatterns":    "Додаткові кастомні патерни",
+  "config.bookmarkColor":     "Колір іконки закладки в gutter"
+}

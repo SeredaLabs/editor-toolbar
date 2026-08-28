@@ -1,0 +1,17 @@
+{
+  "displayName": "Editor Toolbar",
+  "description": "Закладки, форматирование, комментирование и навигация по функциям для любого языка",
+  "cmd.addBookmark":      "Установить/снять закладку",
+  "cmd.prevBookmark":     "Предыдущая закладка",
+  "cmd.nextBookmark":     "Следующая закладка",
+  "cmd.listBookmarks":    "Список закладок",
+  "cmd.formatDocument":   "Форматировать документ",
+  "cmd.toggleComment":    "Строчный комментарий",
+  "cmd.openSettings":     "Настройки",
+  "cmd.showFunctionList": "Функции и процедуры",
+  "cmd.foldAll":          "Свернуть всё",
+  "cmd.unfoldAll":        "Развернуть всё",
+  "config.title":             "Editor Toolbar",
+  "config.customPatterns":    "Дополнительные кастомные паттерны",
+  "config.bookmarkColor":     "Цвет иконки закладки в gutter"
+}
