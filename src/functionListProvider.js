@@ -41,6 +41,34 @@ const KNOWN_LANGS = new Set(DEFAULT_PATTERNS.flatMap(p => p.langs));
 
 const SKIP = new Set(['if','for','while','switch','catch','else','return','import','export','class','const','let','var','new','delete','typeof','instanceof']);
 
+const KIND_LABEL = {
+  procedure:       'Procedure',
+  function:        'Function',
+  method:          'Method',
+  custom:          'Custom',
+  'bsl-procedure': 'Procedure',
+  'bsl-function':  'Function',
+};
+
+// Порядок секцій у згрупованому Quick Pick; секція без жодного символу в файлі
+// просто не з'являється — порожніх заголовків не показуємо.
+const GROUP_ORDER = ['Procedure', 'Function', 'Method', 'Custom'];
+const GROUP_TITLE = { Procedure: 'PROCEDURES', Function: 'FUNCTIONS', Method: 'METHODS', Custom: 'CUSTOM' };
+
+// Чиста функція без залежності від vscode — групує символи за нормалізованим
+// kind-лейблом у фіксованому порядку, готова для показу як секції Quick Pick.
+function groupByKindLabel(fns) {
+  const groups = new Map();
+  for (const fn of fns) {
+    const label = KIND_LABEL[fn.kind] ?? 'Function';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(fn);
+  }
+  return GROUP_ORDER
+    .map(label => ({ title: GROUP_TITLE[label], items: groups.get(label) ?? [] }))
+    .filter(g => g.items.length);
+}
+
 // Ліміт довжини рядка для кастомних (user-supplied) патернів — обмежує час бектрекінгу
 // навіть для потенційно ReDoS-вразливого regex, який користувач може вписати в customPatterns.
 const CUSTOM_PATTERN_MAX_LINE_LENGTH = 500;
@@ -125,15 +153,6 @@ class FunctionListProvider {
       custom:    'symbol-key',
     };
 
-    const kindLabel = {
-      procedure:     'Procedure',
-      function:      'Function',
-      method:        'Method',
-      custom:        'Custom',
-      'bsl-procedure': 'Procedure',
-      'bsl-function':  'Function',
-    };
-
     const bslIcon = {
       'bsl-procedure': vscode.Uri.joinPath(this._extensionUri, 'images', 'icon-procedure.svg'),
       'bsl-function':  vscode.Uri.joinPath(this._extensionUri, 'images', 'icon-function.svg'),
@@ -151,15 +170,22 @@ class FunctionListProvider {
 
     let sortedAlpha = false;
 
-    const buildItems = (alpha) => fns
-      .slice()
-      .sort(alpha ? (a, b) => a.name.localeCompare(b.name) : (a, b) => a.line - b.line)
-      .map(fn => ({
-        label:       fn.name,
-        description: `${kindLabel[fn.kind] ?? 'Function'} · line ${fn.line + 1}`,
-        iconPath:    bslIcon[fn.kind] ?? new vscode.ThemeIcon(kindIcon[fn.kind] ?? 'symbol-function'),
-        line:        fn.line,
-      }));
+    const toItem = (fn) => ({
+      label:       fn.name,
+      description: `${KIND_LABEL[fn.kind] ?? 'Function'} · line ${fn.line + 1}`,
+      iconPath:    bslIcon[fn.kind] ?? new vscode.ThemeIcon(kindIcon[fn.kind] ?? 'symbol-function'),
+      line:        fn.line,
+    });
+
+    const buildItems = (alpha) => {
+      const sorter = alpha ? (a, b) => a.name.localeCompare(b.name) : (a, b) => a.line - b.line;
+      const items = [];
+      for (const group of groupByKindLabel(fns)) {
+        items.push({ kind: vscode.QuickPickItemKind.Separator, label: group.title });
+        items.push(...group.items.slice().sort(sorter).map(toItem));
+      }
+      return items;
+    };
 
     qp.items = buildItems(false);
 
@@ -238,4 +264,4 @@ class FunctionListProvider {
   }
 }
 
-module.exports = { FunctionListProvider };
+module.exports = { FunctionListProvider, groupByKindLabel };

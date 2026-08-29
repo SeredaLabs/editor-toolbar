@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 — Grouped Navigator (Smart Nav, part 2)
+
+- The Functions & Procedures quick pick now groups symbols by type — `PROCEDURES`, `FUNCTIONS`, `METHODS`, `CUSTOM` — using VS Code's native `QuickPickItemKind.Separator` section headers, instead of one flat list. A section only appears if the file actually has a symbol of that kind.
+- Within each group, the existing sort toggle (by line / alphabetical) still applies — grouping and sorting are independent
+- The kind→label mapping and the grouping logic are pure, exported functions (`groupByKindLabel`), decoupled from `vscode` — directly unit-tested
+
 ## 1.1.2 — Visible Navigation on Folded Files
 
 - Jumping to a symbol from the Functions & Procedures quick pick now unfolds the destination procedure/function (`editor.unfold`, one level) instead of leaving it collapsed — on a fully-folded file every folded line looks the same (the theme's `editor.foldBackground` tint), so the destination was indistinguishable from every other collapsed line

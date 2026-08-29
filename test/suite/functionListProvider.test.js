@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('assert');
 const vscode = require('vscode');
-const { FunctionListProvider } = require('../../src/functionListProvider');
+const { FunctionListProvider, groupByKindLabel } = require('../../src/functionListProvider');
 
 async function openDoc(content, language) {
   return vscode.workspace.openTextDocument({ content, language });
@@ -91,6 +91,35 @@ suite('FunctionListProvider._parse', () => {
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'shouldMatch');
     assert.strictEqual(results[0].kind, 'custom');
+  });
+});
+
+suite('groupByKindLabel', () => {
+  test('groups symbols under PROCEDURES/FUNCTIONS in a fixed order', () => {
+    const fns = [
+      { name: 'CalculateTotal', line: 10, kind: 'bsl-function' },
+      { name: 'CreateOrder', line: 0, kind: 'bsl-procedure' },
+      { name: 'SaveOrder', line: 5, kind: 'bsl-procedure' },
+      { name: 'GetPrice', line: 15, kind: 'bsl-function' },
+    ];
+    const groups = groupByKindLabel(fns);
+    assert.deepStrictEqual(groups.map(g => g.title), ['PROCEDURES', 'FUNCTIONS']);
+    assert.deepStrictEqual(groups[0].items.map(f => f.name), ['CreateOrder', 'SaveOrder']);
+    assert.deepStrictEqual(groups[1].items.map(f => f.name), ['CalculateTotal', 'GetPrice']);
+  });
+
+  test('omits a section header for a kind with no symbols', () => {
+    const fns = [{ name: 'onlyOne', line: 0, kind: 'function' }];
+    const groups = groupByKindLabel(fns);
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].title, 'FUNCTIONS');
+  });
+
+  test('an unknown kind falls back to the Function group', () => {
+    const fns = [{ name: 'weird', line: 0, kind: 'totally-unrecognized' }];
+    const groups = groupByKindLabel(fns);
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].title, 'FUNCTIONS');
   });
 });
 
