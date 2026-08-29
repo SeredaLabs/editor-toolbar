@@ -7,6 +7,11 @@
 - The `onDidChangeTextDocument` listener now only schedules a refresh for the currently active document, instead of reacting to background document edits from anywhere in the workspace
 - Added a test suite covering extension activation/command registration and the new cache behavior
 
+## 1.0.1 — Parsing Performance
+
+- `FunctionListProvider._parse()` no longer reads the `editorToolbar.customPatterns` setting and recompiles custom regexes on every line — configuration is read and custom patterns are compiled once per parse call, before the line loop, instead of on every iteration
+- Measured ~5.7x–13x faster parsing on a synthetic ~100k-line file, depending on environment
+
 ## 1.0.2 — Hotfix
 
 - Fixed: `F2` (Next Bookmark) conflicted with VS Code's native Rename Symbol — remapped to `Ctrl+Shift+F2`
