@@ -94,6 +94,36 @@ suite('FunctionListProvider._parse', () => {
   });
 });
 
+suite('FunctionListProvider navigation UX', () => {
+  test('unfolding the target line reveals a folded procedure body', async () => {
+    // Same mechanism showQuickPick() uses on accept: on a fully-folded file every
+    // header line looks identical (editor.foldBackground), so the destination of
+    // a jump is invisible unless we unfold it back open.
+    const doc = await openDoc('function foo() {\n  return 1;\n}\nfunction bar() {}\n', 'javascript');
+    const editor = await vscode.window.showTextDocument(doc, { preview: false });
+
+    await vscode.commands.executeCommand('editor.fold', { selectionLines: [0] });
+    const foldedLines = editor.visibleRanges.map(r => [r.start.line, r.end.line]);
+    assert.ok(!foldedLines.some(([s, e]) => s <= 1 && 1 <= e), 'line 1 should be hidden once folded');
+
+    await vscode.commands.executeCommand('editor.unfold', { selectionLines: [0], levels: 1 });
+    const unfoldedLines = editor.visibleRanges.map(r => [r.start.line, r.end.line]);
+    assert.ok(unfoldedLines.some(([s, e]) => s <= 1 && 1 <= e), 'line 1 should be visible again after unfold');
+  });
+
+  test('_flashLine sets and then clears the reveal-highlight decoration', async () => {
+    const provider = new FunctionListProvider(vscode.Uri.file(__dirname));
+    const doc = await openDoc('function foo() {}\n', 'javascript');
+    const editor = await vscode.window.showTextDocument(doc, { preview: false });
+
+    provider._flashLine(editor, 0);
+    assert.ok(provider._highlightTimer, 'a clear-highlight timer should be scheduled');
+
+    provider.dispose();
+    assert.strictEqual(provider._highlightTimer, null, 'dispose() should cancel the pending highlight timer');
+  });
+});
+
 suite('FunctionListProvider cache', () => {
   test('_getFunctions reuses cached results while the document version is unchanged', async () => {
     const provider = new FunctionListProvider(vscode.Uri.file(__dirname));

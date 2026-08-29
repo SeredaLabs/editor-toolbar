@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 — Visible Navigation on Folded Files
+
+- Jumping to a symbol from the Functions & Procedures quick pick now unfolds the destination procedure/function (`editor.unfold`, one level) instead of leaving it collapsed — on a fully-folded file every folded line looks the same (the theme's `editor.foldBackground` tint), so the destination was indistinguishable from every other collapsed line
+- The destination line also gets a brief highlight flash (using the same `editor.symbolHighlightBackground` / `editor.symbolHighlightBorder` theme colors VS Code's own symbol navigation uses) so it's obvious at a glance where you landed
+
 ## 1.1.1 — Cross-Language False Positives
 
 - Function/procedure detection patterns are now scoped to the document's actual language (`document.languageId`) instead of being tried against every file regardless of language — e.g. a `.bsl` file only tries the BSL patterns (plus any custom user patterns), not the C#/Java/Go/Python/etc. ones

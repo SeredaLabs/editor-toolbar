@@ -52,12 +52,38 @@ class FunctionListProvider {
     // uri string -> { version, results } — уникає повторного синхронного парсингу
     // всього файлу при кожному відкритті Quick Pick, якщо документ не змінювався.
     this._cache = new Map();
+
+    // Той самий колір, яким сам VS Code підсвічує ціль при переході по символу
+    // (Outline, Ctrl+T) — коротка "спалах"-підсвітка рядка, куди перейшли з Navigator.
+    this._revealHighlight = vscode.window.createTextEditorDecorationType({
+      isWholeLine: true,
+      backgroundColor: new vscode.ThemeColor('editor.symbolHighlightBackground'),
+      borderColor: new vscode.ThemeColor('editor.symbolHighlightBorder'),
+      borderWidth: '1px',
+      borderStyle: 'solid',
+    });
+    this._highlightTimer = null;
   }
 
   dispose() {
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = null;
     this._cache.clear();
+    if (this._highlightTimer) clearTimeout(this._highlightTimer);
+    this._highlightTimer = null;
+    this._revealHighlight.dispose();
+  }
+
+  // Коротко підсвічує рядок призначення, щоб було видно, куди саме перейшли —
+  // інакше на повністю згорнутому файлі кожен згорнутий рядок виглядає однаково
+  // (editor.foldBackground теми) і ціль губиться серед них.
+  _flashLine(editor, line) {
+    if (this._highlightTimer) clearTimeout(this._highlightTimer);
+    editor.setDecorations(this._revealHighlight, [new vscode.Range(line, 0, line, 0)]);
+    this._highlightTimer = setTimeout(() => {
+      editor.setDecorations(this._revealHighlight, []);
+      this._highlightTimer = null;
+    }, 700);
   }
 
   refresh(doc) {
@@ -155,8 +181,14 @@ class FunctionListProvider {
       const pos = new vscode.Position(picked.line, 0);
       const target = vscode.window.visibleTextEditors.find(e => e.document === editor.document)
         ?? await vscode.window.showTextDocument(editor.document, { preview: false });
+
+      // Розгортаємо цільову процедуру/функцію — інакше на повністю згорнутому файлі
+      // перехід виглядає так, ніби нічого не сталось (усі рядки виглядають однаково).
+      await vscode.commands.executeCommand('editor.unfold', { selectionLines: [picked.line], levels: 1 });
+
       target.selection = new vscode.Selection(pos, pos);
       target.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+      this._flashLine(target, picked.line);
     });
 
     qp.onDidHide(() => qp.dispose());
