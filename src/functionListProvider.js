@@ -6,31 +6,38 @@ const W = '[\\w\\u0400-\\u04FF]+';
 
 const DEFAULT_PATTERNS = [
   // 1C BSL — платформа підтримує тільки російські ключові слова (плюс англійський варіант нижче)
-  { re: new RegExp(`^\\s*Процедура\\s+(${W})\\s*\\(`), kind: 'bsl-procedure' },
-  { re: new RegExp(`^\\s*Функция\\s+(${W})\\s*\\(`),   kind: 'bsl-function' },
+  { re: new RegExp(`^\\s*Процедура\\s+(${W})\\s*\\(`), kind: 'bsl-procedure', langs: ['bsl'] },
+  { re: new RegExp(`^\\s*Функция\\s+(${W})\\s*\\(`),   kind: 'bsl-function',  langs: ['bsl'] },
   // JavaScript / TypeScript
-  { re: new RegExp(`^\\s*(?:export\\s+)?(?:async\\s+)?function\\s+(${W})\\s*\\(`), kind: 'function' },
+  { re: new RegExp(`^\\s*(?:export\\s+)?(?:async\\s+)?function\\s+(${W})\\s*\\(`), kind: 'function', langs: ['javascript', 'typescript', 'javascriptreact', 'typescriptreact'] },
   // Python
-  { re: new RegExp(`^\\s*(?:async\\s+)?def\\s+(${W})\\s*\\(`),             kind: 'function' },
+  { re: new RegExp(`^\\s*(?:async\\s+)?def\\s+(${W})\\s*\\(`),             kind: 'function', langs: ['python'] },
   // Go — метод (є ресивер) відрізняється від звичайної функції
-  { re: new RegExp(`^\\s*func\\s+\\(\\w+\\s+\\*?\\w+\\)\\s+(${W})\\s*\\(`), kind: 'method' },
-  { re: new RegExp(`^\\s*func\\s+(${W})\\s*\\(`),                          kind: 'function' },
+  { re: new RegExp(`^\\s*func\\s+\\(\\w+\\s+\\*?\\w+\\)\\s+(${W})\\s*\\(`), kind: 'method',   langs: ['go'] },
+  { re: new RegExp(`^\\s*func\\s+(${W})\\s*\\(`),                          kind: 'function', langs: ['go'] },
   // Kotlin / Swift
-  { re: new RegExp(`^\\s*(?:fun|func)\\s+(${W})\\s*[<(]`),                 kind: 'function' },
+  { re: new RegExp(`^\\s*(?:fun|func)\\s+(${W})\\s*[<(]`),                 kind: 'function', langs: ['kotlin', 'swift'] },
   // Rust
-  { re: new RegExp(`^\\s*(?:pub\\s+)?(?:async\\s+)?fn\\s+(${W})\\s*[<(]`), kind: 'function' },
+  { re: new RegExp(`^\\s*(?:pub\\s+)?(?:async\\s+)?fn\\s+(${W})\\s*[<(]`), kind: 'function', langs: ['rust'] },
   // PHP
-  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static)\\s+)*function\\s+(${W})\\s*\\(`), kind: 'function' },
+  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static)\\s+)*function\\s+(${W})\\s*\\(`), kind: 'function', langs: ['php'] },
   // C# / Java / C++
-  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static|virtual|override|async)\\s+)*(?:void|int|string|bool|float|double|${W})\\s+(${W})\\s*\\(`), kind: 'method' },
+  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static|virtual|override|async)\\s+)*(?:void|int|string|bool|float|double|${W})\\s+(${W})\\s*\\(`), kind: 'method', langs: ['csharp', 'java', 'cpp', 'c'] },
   // VBA / VBScript
-  { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Sub\\s+(${W})\\s*\\(`),      kind: 'procedure' },
-  { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Function\\s+(${W})\\s*\\(`), kind: 'function' },
+  { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Sub\\s+(${W})\\s*\\(`),      kind: 'procedure', langs: ['vb'] },
+  { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Function\\s+(${W})\\s*\\(`), kind: 'function',  langs: ['vb'] },
   // Ruby
-  { re: new RegExp(`^\\s*def\\s+(${W})`),                                  kind: 'function' },
+  { re: new RegExp(`^\\s*def\\s+(${W})`),                                  kind: 'function', langs: ['ruby'] },
   // Shell / Bash
-  { re: new RegExp(`^\\s*(${W})\\s*\\(\\s*\\)\\s*\\{`),                    kind: 'function' },
+  { re: new RegExp(`^\\s*(${W})\\s*\\(\\s*\\)\\s*\\{`),                    kind: 'function', langs: ['shellscript'] },
 ];
+
+// Мови, для яких є спеціалізовані патерни вище — для файлу з такою мовою пробуємо
+// тільки патерни цієї мови (усуває фальшиві збіги з чужих мов, наприклад коли
+// заглушка C#/Java "СЛОВО СЛОВО(" ловить виклик вбудованої функції 1С типу
+// "Если ЗначениеЗаповнено(" чи "Новый ОписаниеОповещения("). Для нерозпізнаної/
+// незнайомої мови лишаємо старий "пробуй усе" фолбек.
+const KNOWN_LANGS = new Set(DEFAULT_PATTERNS.flatMap(p => p.langs));
 
 const SKIP = new Set(['if','for','while','switch','catch','else','return','import','export','class','const','let','var','new','delete','typeof','instanceof']);
 
@@ -162,7 +169,10 @@ class FunctionListProvider {
       .map(p => { try { return { re: new RegExp(p), kind: 'custom' }; } catch { return null; } })
       .filter(Boolean);
 
-    const patterns = [...DEFAULT_PATTERNS, ...custom];
+    const langPatterns = KNOWN_LANGS.has(doc.languageId)
+      ? DEFAULT_PATTERNS.filter(p => p.langs.includes(doc.languageId))
+      : DEFAULT_PATTERNS;
+    const patterns = [...langPatterns, ...custom];
     const results = [];
     const seen = new Set();
 

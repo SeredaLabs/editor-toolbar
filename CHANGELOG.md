@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.1 — Cross-Language False Positives
+
+- Function/procedure detection patterns are now scoped to the document's actual language (`document.languageId`) instead of being tried against every file regardless of language — e.g. a `.bsl` file only tries the BSL patterns (plus any custom user patterns), not the C#/Java/Go/Python/etc. ones
+- Fixes a real-world false positive where the generic C#/Java "`TYPE NAME(`" catch-all pattern matched plain BSL function *calls* without wrapping parens around the condition — e.g. `Если ЗначениеЗаполнено(...)` or `Новый ОписаниеОповещения(...)` — and listed them in the Functions & Procedures quick pick as bogus "Method" entries alongside real `Процедура`/`Функция` declarations
+- Files whose language isn't one of the ones with a dedicated pattern set keep the previous "try everything" fallback, so support for less common languages is unaffected
+
 ## 1.1.0 — Async Cache (Smart Nav, part 1)
 
 - `FunctionListProvider` now actually caches parse results per document (keyed by URI + document version) instead of `refresh()` being a no-op — opening the Functions & Procedures quick pick on an unchanged document is now a cache hit instead of a full re-parse

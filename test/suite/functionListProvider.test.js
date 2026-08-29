@@ -43,6 +43,23 @@ suite('FunctionListProvider._parse', () => {
     assert.strictEqual(results[0].name, 'Bar');
   });
 
+  test('does not misdetect a call inside a condition as a method (cross-language false positive)', async () => {
+    // The generic "TYPE NAME(" catch-all (meant for C#/Java) also matches "if
+    // checkValue(" — a plain function call, not a declaration. Scoping patterns
+    // to the document's actual language (here: Python, which only looks for
+    // `def`) must keep this from being misdetected as a method.
+    const python = [
+      'def choose_period():',
+      '    if check_value(period):',
+      '        return None',
+    ].join('\n');
+    const doc = await openDoc(python, 'python');
+    const results = provider._parse(doc);
+    assert.strictEqual(results.length, 1, 'only the real def declaration should be detected');
+    assert.strictEqual(results[0].name, 'choose_period');
+    assert.strictEqual(results[0].kind, 'function');
+  });
+
   test('does not hang on an adversarial long line (linear-time regression guard)', async () => {
     const adversarial = 'public static '.repeat(2000) + 'function foo() {';
     const doc = await openDoc(adversarial, 'php');
