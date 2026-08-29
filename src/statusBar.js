@@ -6,8 +6,8 @@ const ITEMS = [
   { icon: 'bookmark',         title: 'Toggle Bookmark',   kbd: 'Ctrl+F2',     cmd: 'editorToolbar.addBookmark',    p: -1100 },
   { icon: 'arrow-small-up',   title: 'Prev Bookmark',     kbd: 'Shift+F2',    cmd: 'editorToolbar.prevBookmark',   p: -1101 },
   { icon: 'arrow-small-down', title: 'Next Bookmark',     kbd: 'F2',          cmd: 'editorToolbar.nextBookmark',   p: -1102 },
-  { icon: 'wand',             title: 'Format Document',   kbd: 'Shift+Alt+F', cmd: 'editorToolbar.formatDocument', p: -1110 },
-  { icon: 'comment',          title: 'Line Comment',      kbd: 'Ctrl+/',      cmd: 'editorToolbar.toggleComment',  p: -1120 },
+  { icon: 'wand',             title: 'Format Document',   kbd: 'Shift+Alt+F', cmd: 'editor.action.formatDocument', p: -1110 },
+  { icon: 'comment',          title: 'Line Comment',      kbd: 'Ctrl+/',      cmd: 'editor.action.commentLine',    p: -1120 },
   { icon: 'gear',             title: 'Toolbar Settings',  kbd: '',            cmd: 'editorToolbar.openSettings',   p: -1130 },
 ];
 

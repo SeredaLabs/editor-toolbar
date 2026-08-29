@@ -5,8 +5,6 @@
   "cmd.prevBookmark":     "Previous Bookmark",
   "cmd.nextBookmark":     "Next Bookmark",
   "cmd.listBookmarks":    "List Bookmarks",
-  "cmd.formatDocument":   "Format Document",
-  "cmd.toggleComment":    "Line Comment",
   "cmd.openSettings":     "Settings",
   "cmd.showFunctionList": "Functions & Procedures",
   "cmd.foldAll":          "Fold All",

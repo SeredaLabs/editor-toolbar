@@ -20,9 +20,9 @@ const DEFAULT_PATTERNS = [
   // Rust
   { re: new RegExp(`^\\s*(?:pub\\s+)?(?:async\\s+)?fn\\s+(${W})\\s*[<(]`), kind: 'function' },
   // PHP
-  { re: new RegExp(`^\\s*(?:public|private|protected|static|\\s)*function\\s+(${W})\\s*\\(`), kind: 'function' },
+  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static)\\s+)*function\\s+(${W})\\s*\\(`), kind: 'function' },
   // C# / Java / C++
-  { re: new RegExp(`^\\s*(?:public|private|protected|static|virtual|override|async|void|int|string|bool|float|double)\\s+(?:${W}\\s+)?(${W})\\s*\\(`), kind: 'method' },
+  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static|virtual|override|async)\\s+)*(?:void|int|string|bool|float|double|${W})\\s+(${W})\\s*\\(`), kind: 'method' },
   // VBA / VBScript
   { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Sub\\s+(${W})\\s*\\(`),      kind: 'procedure' },
   { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Function\\s+(${W})\\s*\\(`), kind: 'function' },
@@ -34,24 +34,52 @@ const DEFAULT_PATTERNS = [
 
 const SKIP = new Set(['if','for','while','switch','catch','else','return','import','export','class','const','let','var','new','delete','typeof','instanceof']);
 
+// Ліміт довжини рядка для кастомних (user-supplied) патернів — обмежує час бектрекінгу
+// навіть для потенційно ReDoS-вразливого regex, який користувач може вписати в customPatterns.
+const CUSTOM_PATTERN_MAX_LINE_LENGTH = 500;
+
 class FunctionListProvider {
   constructor(extensionUri) {
     this._debounceTimer = null;
     this._extensionUri = extensionUri;
+    // uri string -> { version, results } — уникає повторного синхронного парсингу
+    // всього файлу при кожному відкритті Quick Pick, якщо документ не змінювався.
+    this._cache = new Map();
   }
 
-  refresh() {}
-
-  refreshDebounced() {
+  dispose() {
     if (this._debounceTimer) clearTimeout(this._debounceTimer);
-    this._debounceTimer = setTimeout(() => this.refresh(), 500);
+    this._debounceTimer = null;
+    this._cache.clear();
+  }
+
+  refresh(doc) {
+    if (!doc) return;
+    this._cache.set(doc.uri.toString(), { version: doc.version, results: this._parse(doc) });
+  }
+
+  // `doc` захоплюється в момент події, а не читається з activeTextEditor після таймауту —
+  // інакше можна оновити кеш не того файлу, якщо користувач встиг перемкнути вкладку.
+  refreshDebounced(doc) {
+    if (this._debounceTimer) clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(() => this.refresh(doc), 500);
+  }
+
+  _getFunctions(doc) {
+    const key = doc.uri.toString();
+    const cached = this._cache.get(key);
+    if (cached && cached.version === doc.version) return cached.results;
+
+    const results = this._parse(doc);
+    this._cache.set(key, { version: doc.version, results });
+    return results;
   }
 
   async showQuickPick() {
     const editor = vscode.window.activeTextEditor;
     if (!editor) return;
 
-    const fns = this._parse(editor.document);
+    const fns = this._getFunctions(editor.document);
     if (!fns.length) {
       vscode.window.showInformationMessage('No functions or procedures found in this file.');
       return;
@@ -109,14 +137,19 @@ class FunctionListProvider {
       qp.items = buildItems(sortedAlpha);
     });
 
-    qp.onDidAccept(() => {
+    qp.onDidAccept(async () => {
       const picked = qp.activeItems[0];
       qp.hide();
-      if (picked) {
-        const pos = new vscode.Position(picked.line, 0);
-        editor.selection = new vscode.Selection(pos, pos);
-        editor.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
-      }
+      if (!picked) return;
+
+      // `editor` було захоплено на момент відкриття Quick Pick — якщо користувач встиг
+      // перемкнути активну вкладку до вибору, застосовуємо результат до того ж документа,
+      // а не до вкладки, що випадково опинилась активною зараз.
+      const pos = new vscode.Position(picked.line, 0);
+      const target = vscode.window.visibleTextEditors.find(e => e.document === editor.document)
+        ?? await vscode.window.showTextDocument(editor.document, { preview: false });
+      target.selection = new vscode.Selection(pos, pos);
+      target.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
     });
 
     qp.onDidHide(() => qp.dispose());
@@ -143,9 +176,11 @@ class FunctionListProvider {
           trimmed.startsWith(';')  || trimmed.startsWith("'")) continue;
 
       for (const { re, kind } of patterns) {
+        if (kind === 'custom' && text.length > CUSTOM_PATTERN_MAX_LINE_LENGTH) continue;
+
         const m = re.exec(text);
         if (m) {
-          const name = m[1] || m[2];
+          const name = m[1];
           if (name && name.length > 1 && !SKIP.has(name)) {
             const key = `${name}:${i}`;
             if (!seen.has(key)) {

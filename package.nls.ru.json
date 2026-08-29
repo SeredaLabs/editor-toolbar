@@ -5,8 +5,6 @@
   "cmd.prevBookmark":     "Предыдущая закладка",
   "cmd.nextBookmark":     "Следующая закладка",
   "cmd.listBookmarks":    "Список закладок",
-  "cmd.formatDocument":   "Форматировать документ",
-  "cmd.toggleComment":    "Строчный комментарий",
   "cmd.openSettings":     "Настройки",
   "cmd.showFunctionList": "Функции и процедуры",
   "cmd.foldAll":          "Свернуть всё",

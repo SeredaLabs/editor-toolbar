@@ -10,7 +10,7 @@ Navigate your code with persistent bookmarks per file.
 | Action | Keybinding |
 |--------|-----------|
 | Toggle bookmark on current line | `Ctrl+F2` |
-| Jump to next bookmark | `F2` |
+| Jump to next bookmark | `Ctrl+Shift+F2` |
 | Jump to previous bookmark | `Shift+F2` |
 | List all bookmarks in current file | `Ctrl+Alt+F2` |
 
@@ -27,7 +27,9 @@ Opens a searchable quick pick list of all functions and procedures in the curren
 - Supports 1C:BSL, JavaScript, TypeScript, Python, PHP, Go, Rust, Ruby, C#, Java, Kotlin, Swift, Shell and more
 
 ### ⊟ Fold / ⊞ Unfold
-Fold or unfold all code blocks in the editor (`Ctrl+Shift+[` / `Ctrl+Shift+]`).
+Fold or unfold all code blocks in the editor via the editor toolbar button. No dedicated keybinding is
+bound (VS Code's native `Ctrl+K Ctrl+0` / `Ctrl+K Ctrl+J` already do this without conflicting with
+single-region fold/unfold on `Ctrl+Shift+[` / `Ctrl+Shift+]`).
 
 ## Status Bar
 

@@ -2,7 +2,7 @@
   "name": "editor-toolbar",
   "displayName": "%displayName%",
   "description": "%description%",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "seredalabs",
   "repository": {
     "type": "git",
@@ -14,14 +14,19 @@
   "activationEvents": ["onStartupFinished"],
   "main": "./src/extension.js",
   "icon": "images/icon.png",
+  "scripts": {
+    "test": "node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "@vscode/test-electron": "^2.4.1",
+    "mocha": "^10.4.0"
+  },
   "contributes": {
     "commands": [
       { "command": "editorToolbar.addBookmark",      "title": "%cmd.addBookmark%",      "category": "Editor Toolbar" },
       { "command": "editorToolbar.prevBookmark",     "title": "%cmd.prevBookmark%",     "category": "Editor Toolbar" },
       { "command": "editorToolbar.nextBookmark",     "title": "%cmd.nextBookmark%",     "category": "Editor Toolbar" },
       { "command": "editorToolbar.listBookmarks",    "title": "%cmd.listBookmarks%",    "category": "Editor Toolbar" },
-      { "command": "editorToolbar.formatDocument",   "title": "%cmd.formatDocument%",   "category": "Editor Toolbar" },
-      { "command": "editorToolbar.toggleComment",    "title": "%cmd.toggleComment%",    "category": "Editor Toolbar" },
       { "command": "editorToolbar.openSettings",     "title": "%cmd.openSettings%",     "category": "Editor Toolbar" },
       { "command": "editorToolbar.showFunctionList", "title": "%cmd.showFunctionList%", "category": "Editor Toolbar", "icon": "$(list-flat)" },
       { "command": "editorToolbar.foldAll",          "title": "%cmd.foldAll%",          "category": "Editor Toolbar", "icon": "$(collapse-all)" },
@@ -35,14 +40,11 @@
       ]
     },
     "keybindings": [
-      { "command": "editorToolbar.addBookmark",      "key": "ctrl+f2",      "when": "editorTextFocus" },
-      { "command": "editorToolbar.nextBookmark",     "key": "f2",           "when": "editorTextFocus" },
-      { "command": "editorToolbar.prevBookmark",     "key": "shift+f2",     "when": "editorTextFocus" },
-      { "command": "editorToolbar.listBookmarks",    "key": "ctrl+alt+f2", "when": "editorTextFocus" },
-      { "command": "editorToolbar.toggleComment",    "key": "ctrl+/",       "when": "editorTextFocus" },
-      { "command": "editorToolbar.showFunctionList", "key": "ctrl+alt+o",   "when": "editorTextFocus" },
-      { "command": "editorToolbar.foldAll",          "key": "ctrl+shift+[", "when": "editorTextFocus" },
-      { "command": "editorToolbar.unfoldAll",        "key": "ctrl+shift+]", "when": "editorTextFocus" }
+      { "command": "editorToolbar.addBookmark",      "key": "ctrl+f2",        "when": "editorTextFocus" },
+      { "command": "editorToolbar.nextBookmark",     "key": "ctrl+shift+f2", "when": "editorTextFocus" },
+      { "command": "editorToolbar.prevBookmark",     "key": "shift+f2",       "when": "editorTextFocus" },
+      { "command": "editorToolbar.listBookmarks",    "key": "ctrl+alt+f2",   "when": "editorTextFocus" },
+      { "command": "editorToolbar.showFunctionList", "key": "ctrl+alt+o",     "when": "editorTextFocus" }
     ],
     "configuration": {
       "title": "%config.title%",

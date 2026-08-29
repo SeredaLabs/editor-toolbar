@@ -14,8 +14,6 @@ function activate(context) {
     ['editorToolbar.prevBookmark',     () => bookmarkManager.prev()],
     ['editorToolbar.nextBookmark',     () => bookmarkManager.next()],
     ['editorToolbar.listBookmarks',    () => bookmarkManager.list()],
-    ['editorToolbar.formatDocument',   () => vscode.commands.executeCommand('editor.action.formatDocument')],
-    ['editorToolbar.toggleComment',    () => vscode.commands.executeCommand('editor.action.commentLine')],
     ['editorToolbar.foldAll',          () => vscode.commands.executeCommand('editor.foldAll')],
     ['editorToolbar.unfoldAll',        () => vscode.commands.executeCommand('editor.unfoldAll')],
     ['editorToolbar.openSettings',     () => vscode.commands.executeCommand('workbench.action.openSettings', 'editorToolbar')],
@@ -33,9 +31,15 @@ function activate(context) {
     vscode.window.onDidChangeActiveTextEditor(editor => {
       if (editor) bookmarkManager.refreshDecorations();
     }),
-    vscode.workspace.onDidChangeTextDocument(() => {
-      functionListProvider.refreshDebounced();
-    })
+    vscode.workspace.onDidChangeTextDocument(event => {
+      // Парсимо тільки активний документ — редагування фонового файлу
+      // (наприклад, автозбереження іншої вкладки) не повинно тригерити роботу.
+      const active = vscode.window.activeTextEditor;
+      if (active && event.document === active.document) {
+        functionListProvider.refreshDebounced(event.document);
+      }
+    }),
+    functionListProvider
   );
 
   // Відображаємо закладки одразу при старті
