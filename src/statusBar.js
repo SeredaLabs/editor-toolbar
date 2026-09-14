@@ -2,45 +2,45 @@
 const vscode = require('vscode');
 
 const ITEMS = [
-  { sep: true,                                                                                                       p: -1099 },
-  { icon: 'bookmark',         title: 'Toggle Bookmark',   kbd: 'Ctrl+F2',     cmd: 'editorToolbar.addBookmark',    p: -1100 },
-  { icon: 'arrow-small-up',   title: 'Prev Bookmark',     kbd: 'Shift+F2',    cmd: 'editorToolbar.prevBookmark',   p: -1101 },
-  { icon: 'arrow-small-down', title: 'Next Bookmark',     kbd: 'F2',          cmd: 'editorToolbar.nextBookmark',   p: -1102 },
-  { icon: 'wand',             title: 'Format Document',   kbd: 'Shift+Alt+F', cmd: 'editor.action.formatDocument', p: -1110 },
-  { icon: 'comment',          title: 'Line Comment',      kbd: 'Ctrl+/',      cmd: 'editor.action.commentLine',    p: -1120 },
-  { icon: 'gear',             title: 'Toolbar Settings',  kbd: '',            cmd: 'editorToolbar.openSettings',   p: -1130 },
+  { icon: 'bookmark', title: 'Toggle Bookmark', cmd: 'editorToolbar.addBookmark' },
+  { icon: 'arrow-small-up', title: 'Previous Bookmark', cmd: 'editorToolbar.prevBookmark' },
+  { icon: 'arrow-small-down', title: 'Next Bookmark', cmd: 'editorToolbar.nextBookmark' },
+  { icon: 'list-selection', title: 'List Bookmarks', cmd: 'editorToolbar.listBookmarks' },
+  { icon: 'wand', title: 'Format Document', cmd: 'editor.action.formatDocument' },
+  { icon: 'comment', title: 'Line Comment', cmd: 'editor.action.commentLine' },
+  { icon: 'gear', title: 'Toolbar Settings', cmd: 'editorToolbar.openSettings' },
 ];
 
 class StatusBar {
   constructor(context) {
     this._items = [];
-    // правильно підключаємо dispose до context
+    this._listener = vscode.window.onDidChangeActiveTextEditor(() => this._updateVisibility());
     context.subscriptions.push(this);
   }
 
   show() {
-    for (const def of ITEMS) {
-      if (def.sep) {
-        const sep = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, def.p);
-        sep.text = '|';
-        sep.show();
-        this._items.push(sep);
-        continue;
-      }
-      const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, def.p);
+    if (this._items.length) return;
+    for (const [index, def] of ITEMS.entries()) {
+      const item = vscode.window.createStatusBarItem(`editorToolbar.${def.cmd}`, vscode.StatusBarAlignment.Left, -1100 - index);
       item.text = `$(${def.icon})`;
-      const md = new vscode.MarkdownString('', true);
-      md.isTrusted = true;
-      md.appendMarkdown(`**${def.title}**`);
-      if (def.kbd) md.appendMarkdown(`&nbsp;&nbsp;\`${def.kbd}\``);
-      item.tooltip = md;
+      item.name = vscode.l10n.t(def.title);
+      // Shortcuts can be rebound and differ by OS; the Keyboard Shortcuts editor owns their display.
+      item.tooltip = item.name;
+      item.accessibilityInformation = { label: item.name };
       item.command = def.cmd;
-      item.show();
       this._items.push(item);
+    }
+    this._updateVisibility();
+  }
+
+  _updateVisibility() {
+    for (const item of this._items) {
+      if (vscode.window.activeTextEditor) item.show(); else item.hide();
     }
   }
 
   dispose() {
+    this._listener.dispose();
     for (const item of this._items) item.dispose();
     this._items = [];
   }

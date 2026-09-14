@@ -1,8 +1,10 @@
 'use strict';
+const { suite } = require('uvu');
 const assert = require('assert');
 const vscode = require('vscode');
 
-suite('Extension activation', () => {
+(() => {
+  const test = suite('Extension activation');
   test('activates and registers all expected commands', async () => {
     const ext = vscode.extensions.getExtension('seredalabs.editor-toolbar');
     assert.ok(ext, 'extension not found — is it loaded as the development extension?');
@@ -29,4 +31,5 @@ suite('Extension activation', () => {
     assert.ok(!commands.includes('editorToolbar.formatDocument'));
     assert.ok(!commands.includes('editorToolbar.toggleComment'));
   });
-});
+  test.run();
+})();

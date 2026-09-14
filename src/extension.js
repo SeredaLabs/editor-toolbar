@@ -26,16 +26,12 @@ function activate(context) {
 
   statusBar.show();
 
-  // Оновлюємо закладки при зміні активного файлу
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(editor => {
-      if (editor) bookmarkManager.refreshDecorations();
-    }),
     vscode.workspace.onDidChangeTextDocument(event => {
       // Парсимо тільки активний документ — редагування фонового файлу
       // (наприклад, автозбереження іншої вкладки) не повинно тригерити роботу.
       const active = vscode.window.activeTextEditor;
-      if (active && event.document === active.document) {
+      if (active && event.document === active.document && event.contentChanges.length) {
         functionListProvider.refreshDebounced(event.document);
       }
     }),

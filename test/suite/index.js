@@ -1,25 +1,22 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const Mocha = require('mocha');
+const { run: runSuites } = require('uvu/run');
 
-function run() {
-  const mocha = new Mocha({ ui: 'tdd', color: true, timeout: 10000 });
-  const testsRoot = path.resolve(__dirname);
-
-  return new Promise((resolve, reject) => {
-    const files = fs.readdirSync(testsRoot).filter(f => f.endsWith('.test.js'));
-    files.forEach(f => mocha.addFile(path.join(testsRoot, f)));
-
-    try {
-      mocha.run(failures => {
-        if (failures > 0) reject(new Error(`${failures} tests failed.`));
-        else resolve();
-      });
-    } catch (err) {
-      reject(err);
-    }
-  });
+async function run() {
+  const previousExitCode = process.exitCode;
+  let timer;
+  try {
+    const files = fs.readdirSync(__dirname).filter(file => file.endsWith('.test.js')).sort();
+    await Promise.race([
+      runSuites(files.map(file => ({ name: file, file: path.join(__dirname, file) }))),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Test suite timed out after 120 seconds')), 120000); }),
+    ]);
+    if (process.exitCode) throw new Error('Extension tests failed.');
+  } finally {
+    clearTimeout(timer);
+    process.exitCode = previousExitCode;
+  }
 }
 
 module.exports = { run };

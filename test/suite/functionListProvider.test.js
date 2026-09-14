@@ -1,4 +1,5 @@
 'use strict';
+const { suite } = require('uvu');
 const assert = require('assert');
 const vscode = require('vscode');
 const { FunctionListProvider, groupByKindLabel } = require('../../src/functionListProvider');
@@ -7,38 +8,41 @@ async function openDoc(content, language) {
   return vscode.workspace.openTextDocument({ content, language });
 }
 
-suite('FunctionListProvider._parse', () => {
-  const provider = new FunctionListProvider(vscode.Uri.file(__dirname));
+(() => {
+  const test = suite('FunctionListProvider._parse');
+  const provider = new FunctionListProvider(vscode.Uri.file(__dirname), { symbolProvider: async () => undefined });
 
-  teardown(async () => {
+  test.after(() => provider.dispose());
+
+  test.after.each(async () => {
     await vscode.workspace.getConfiguration('editorToolbar')
       .update('customPatterns', undefined, vscode.ConfigurationTarget.Global);
   });
 
   test('detects PHP function with repeated modifiers', async () => {
     const doc = await openDoc('public static function foo() {\n}\n', 'php');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'foo');
   });
 
   test('detects plain PHP function with no modifiers', async () => {
     const doc = await openDoc('function bar() {\n}\n', 'php');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'bar');
   });
 
   test('detects C# method with multiple modifiers', async () => {
     const doc = await openDoc('public static void Foo() {\n}\n', 'csharp');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'Foo');
   });
 
   test('detects C# method with a single modifier and custom return type', async () => {
     const doc = await openDoc('private OrderResult Bar() {\n}\n', 'csharp');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'Bar');
   });
@@ -54,7 +58,7 @@ suite('FunctionListProvider._parse', () => {
       '        return None',
     ].join('\n');
     const doc = await openDoc(python, 'python');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 1, 'only the real def declaration should be detected');
     assert.strictEqual(results[0].name, 'choose_period');
     assert.strictEqual(results[0].kind, 'function');
@@ -64,7 +68,7 @@ suite('FunctionListProvider._parse', () => {
     const adversarial = 'public static '.repeat(2000) + 'function foo() {';
     const doc = await openDoc(adversarial, 'php');
     const start = Date.now();
-    provider._parse(doc);
+    await provider._parse(doc);
     assert.ok(Date.now() - start < 2000, 'parsing took too long — a pattern may have regressed to catastrophic backtracking');
   });
 
@@ -78,7 +82,7 @@ suite('FunctionListProvider._parse', () => {
 
     const longPadding = ' '.repeat(600);
     const doc = await openDoc(`@@${longPadding}shouldNotMatch(`, 'plaintext');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 0);
   });
 
@@ -87,14 +91,16 @@ suite('FunctionListProvider._parse', () => {
       .update('customPatterns', [CUSTOM_RE], vscode.ConfigurationTarget.Global);
 
     const doc = await openDoc('@@shouldMatch(', 'plaintext');
-    const results = provider._parse(doc);
+    const results = await provider._parse(doc);
     assert.strictEqual(results.length, 1);
     assert.strictEqual(results[0].name, 'shouldMatch');
     assert.strictEqual(results[0].kind, 'custom');
   });
-});
+  test.run();
+})();
 
-suite('groupByKindLabel', () => {
+(() => {
+  const test = suite('groupByKindLabel');
   test('groups symbols under PROCEDURES/FUNCTIONS in a fixed order', () => {
     const fns = [
       { name: 'CalculateTotal', line: 10, kind: 'bsl-function' },
@@ -121,9 +127,11 @@ suite('groupByKindLabel', () => {
     assert.strictEqual(groups.length, 1);
     assert.strictEqual(groups[0].title, 'FUNCTIONS');
   });
-});
+  test.run();
+})();
 
-suite('FunctionListProvider navigation UX', () => {
+(() => {
+  const test = suite('FunctionListProvider navigation UX');
   test('unfolding the target line reveals a folded procedure body', async () => {
     // Same mechanism showQuickPick() uses on accept: on a fully-folded file every
     // header line looks identical (editor.foldBackground), so the destination of
@@ -141,7 +149,7 @@ suite('FunctionListProvider navigation UX', () => {
   });
 
   test('_flashLine sets and then clears the reveal-highlight decoration', async () => {
-    const provider = new FunctionListProvider(vscode.Uri.file(__dirname));
+    const provider = new FunctionListProvider(vscode.Uri.file(__dirname), { symbolProvider: async () => undefined });
     const doc = await openDoc('function foo() {}\n', 'javascript');
     const editor = await vscode.window.showTextDocument(doc, { preview: false });
 
@@ -151,39 +159,44 @@ suite('FunctionListProvider navigation UX', () => {
     provider.dispose();
     assert.strictEqual(provider._highlightTimer, null, 'dispose() should cancel the pending highlight timer');
   });
-});
+  test.run();
+})();
 
-suite('FunctionListProvider cache', () => {
+(() => {
+  const test = suite('FunctionListProvider cache');
   test('_getFunctions reuses cached results while the document version is unchanged', async () => {
-    const provider = new FunctionListProvider(vscode.Uri.file(__dirname));
+    const provider = new FunctionListProvider(vscode.Uri.file(__dirname), { symbolProvider: async () => undefined });
     const doc = await openDoc('function foo() {}\n', 'javascript');
 
-    const first = provider._getFunctions(doc);
-    const second = provider._getFunctions(doc);
+    const first = await provider._getFunctions(doc);
+    const second = await provider._getFunctions(doc);
     assert.strictEqual(first, second, 'expected the same cached array instance');
+    provider.dispose();
   });
 
   test('refresh(doc) populates the cache so a later _getFunctions call is a cache hit', async () => {
-    const provider = new FunctionListProvider(vscode.Uri.file(__dirname));
+    const provider = new FunctionListProvider(vscode.Uri.file(__dirname), { symbolProvider: async () => undefined });
     const doc = await openDoc('function foo() {}\n', 'javascript');
 
-    provider.refresh(doc);
+    await provider.refresh(doc);
     const cached = provider._cache.get(doc.uri.toString());
     assert.strictEqual(cached.version, doc.version);
 
-    const results = provider._getFunctions(doc);
+    const results = await provider._getFunctions(doc);
     assert.strictEqual(results, cached.results);
+    provider.dispose();
   });
 
   test('dispose() clears the pending debounce timer and the cache', async () => {
-    const provider = new FunctionListProvider(vscode.Uri.file(__dirname));
+    const provider = new FunctionListProvider(vscode.Uri.file(__dirname), { symbolProvider: async () => undefined });
     const doc = await openDoc('function foo() {}\n', 'javascript');
 
-    provider.refresh(doc);
+    await provider.refresh(doc);
     provider.refreshDebounced(doc);
     provider.dispose();
 
     assert.strictEqual(provider._cache.size, 0);
     assert.strictEqual(provider._debounceTimer, null);
   });
-});
+  test.run();
+})();

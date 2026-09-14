@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.3.0 — Reliability and navigation
+
+- Bookmarks track edits in active and background documents, remove anchors consumed
+  by multi-line deletion, validate persisted positions, and follow VS Code file/folder
+  renames. Decorations refresh across visible editor groups.
+- Fallback/custom regex parsing runs in a cancellable worker with a one-second
+  deadline. This replaces the ineffective assumption that a 500-character line
+  limit prevents catastrophic backtracking.
+- The navigator uses document symbol providers first, with regex fallback and custom
+  additions. The fallback supports arrow functions, default exports, class methods,
+  one-character names, and English/case-insensitive BSL declarations, and filters
+  block comments, multiline strings, and return expressions.
+- Cache entries include document identity, version, language, and scoped patterns;
+  edits, configuration changes, and document close invalidate pending work. The
+  cache is bounded to 32 documents. Stale async results are discarded.
+- Symbol navigation activates the original editor group before unfolding. Obsolete
+  pickers close on document edits, and highlights clear when jumping between files.
+- Bookmark colors and custom patterns honor folder settings. Color changes apply
+  immediately; invalid colors fall back to the default before SVG construction.
+- Runtime UI is localized into Ukrainian and Russian. Status bar labels no longer
+  advertise hard-coded shortcuts and hide when no text editor is active. Editor-title
+  actions work for untitled and remote documents.
+- Regression tests cover bookmarks, parser cancellation, cache invalidation,
+  split-editor navigation, and resource configuration. Tests use uvu instead of
+  the vulnerable Mocha/serialize-javascript development dependency chain.
+- Isolated test profiles, syntax/localization checks, CI for minimum/stable VS Code
+  on three operating systems, and a version-checked VSIX artifact build.
+
 ## 1.2.0 — Grouped Navigator (Smart Nav, part 2)
 
 - The Functions & Procedures quick pick now groups symbols by type — `PROCEDURES`, `FUNCTIONS`, `METHODS`, `CUSTOM` — using VS Code's native `QuickPickItemKind.Separator` section headers, instead of one flat list. A section only appears if the file actually has a symbol of that kind.

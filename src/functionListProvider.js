@@ -1,267 +1,272 @@
 'use strict';
 const vscode = require('vscode');
+const { parseInWorker } = require('./parseInWorker');
+const { KIND_LABEL, groupByKindLabel } = require('./symbolGroups');
 
-// \w не покриває кирилицю в JS — використовуємо [\w\u0400-\u04FF]+
-const W = '[\\w\\u0400-\\u04FF]+';
+const CACHE_LIMIT = 32;
 
-const DEFAULT_PATTERNS = [
-  // 1C BSL — платформа підтримує тільки російські ключові слова (плюс англійський варіант нижче)
-  { re: new RegExp(`^\\s*Процедура\\s+(${W})\\s*\\(`), kind: 'bsl-procedure', langs: ['bsl'] },
-  { re: new RegExp(`^\\s*Функция\\s+(${W})\\s*\\(`),   kind: 'bsl-function',  langs: ['bsl'] },
-  // JavaScript / TypeScript
-  { re: new RegExp(`^\\s*(?:export\\s+)?(?:async\\s+)?function\\s+(${W})\\s*\\(`), kind: 'function', langs: ['javascript', 'typescript', 'javascriptreact', 'typescriptreact'] },
-  // Python
-  { re: new RegExp(`^\\s*(?:async\\s+)?def\\s+(${W})\\s*\\(`),             kind: 'function', langs: ['python'] },
-  // Go — метод (є ресивер) відрізняється від звичайної функції
-  { re: new RegExp(`^\\s*func\\s+\\(\\w+\\s+\\*?\\w+\\)\\s+(${W})\\s*\\(`), kind: 'method',   langs: ['go'] },
-  { re: new RegExp(`^\\s*func\\s+(${W})\\s*\\(`),                          kind: 'function', langs: ['go'] },
-  // Kotlin / Swift
-  { re: new RegExp(`^\\s*(?:fun|func)\\s+(${W})\\s*[<(]`),                 kind: 'function', langs: ['kotlin', 'swift'] },
-  // Rust
-  { re: new RegExp(`^\\s*(?:pub\\s+)?(?:async\\s+)?fn\\s+(${W})\\s*[<(]`), kind: 'function', langs: ['rust'] },
-  // PHP
-  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static)\\s+)*function\\s+(${W})\\s*\\(`), kind: 'function', langs: ['php'] },
-  // C# / Java / C++
-  { re: new RegExp(`^\\s*(?:(?:public|private|protected|static|virtual|override|async)\\s+)*(?:void|int|string|bool|float|double|${W})\\s+(${W})\\s*\\(`), kind: 'method', langs: ['csharp', 'java', 'cpp', 'c'] },
-  // VBA / VBScript
-  { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Sub\\s+(${W})\\s*\\(`),      kind: 'procedure', langs: ['vb'] },
-  { re: new RegExp(`^\\s*(?:Public\\s+|Private\\s+)?Function\\s+(${W})\\s*\\(`), kind: 'function',  langs: ['vb'] },
-  // Ruby
-  { re: new RegExp(`^\\s*def\\s+(${W})`),                                  kind: 'function', langs: ['ruby'] },
-  // Shell / Bash
-  { re: new RegExp(`^\\s*(${W})\\s*\\(\\s*\\)\\s*\\{`),                    kind: 'function', langs: ['shellscript'] },
-];
-
-// Мови, для яких є спеціалізовані патерни вище — для файлу з такою мовою пробуємо
-// тільки патерни цієї мови (усуває фальшиві збіги з чужих мов, наприклад коли
-// заглушка C#/Java "СЛОВО СЛОВО(" ловить виклик вбудованої функції 1С типу
-// "Если ЗначениеЗаповнено(" чи "Новый ОписаниеОповещения("). Для нерозпізнаної/
-// незнайомої мови лишаємо старий "пробуй усе" фолбек.
-const KNOWN_LANGS = new Set(DEFAULT_PATTERNS.flatMap(p => p.langs));
-
-const SKIP = new Set(['if','for','while','switch','catch','else','return','import','export','class','const','let','var','new','delete','typeof','instanceof']);
-
-const KIND_LABEL = {
-  procedure:       'Procedure',
-  function:        'Function',
-  method:          'Method',
-  custom:          'Custom',
-  'bsl-procedure': 'Procedure',
-  'bsl-function':  'Function',
-};
-
-// Порядок секцій у згрупованому Quick Pick; секція без жодного символу в файлі
-// просто не з'являється — порожніх заголовків не показуємо.
-const GROUP_ORDER = ['Procedure', 'Function', 'Method', 'Custom'];
-const GROUP_TITLE = { Procedure: 'PROCEDURES', Function: 'FUNCTIONS', Method: 'METHODS', Custom: 'CUSTOM' };
-
-// Чиста функція без залежності від vscode — групує символи за нормалізованим
-// kind-лейблом у фіксованому порядку, готова для показу як секції Quick Pick.
-function groupByKindLabel(fns) {
-  const groups = new Map();
-  for (const fn of fns) {
-    const label = KIND_LABEL[fn.kind] ?? 'Function';
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push(fn);
+function flattenSymbols(symbols, uri, languageId, text) {
+  const result = [];
+  const lines = text.split(/\r\n|\r|\n/);
+  function visit(symbol) {
+    const range = symbol.selectionRange || symbol.location?.range || symbol.range;
+    if ((!symbol.location || symbol.location.uri.toString() === uri) && range &&
+        [vscode.SymbolKind.Function, vscode.SymbolKind.Method, vscode.SymbolKind.Constructor].includes(symbol.kind)) {
+      let kind = symbol.kind === vscode.SymbolKind.Function ? 'function' : 'method';
+      if (languageId === 'bsl') {
+        kind = /^\s*(?:Процедура|Procedure)\s/i.test(lines[range.start.line] || '') ? 'bsl-procedure' : 'bsl-function';
+      }
+      result.push({ name: symbol.name, line: range.start.line, character: range.start.character, kind });
+    }
+    for (const child of symbol.children || []) visit(child);
   }
-  return GROUP_ORDER
-    .map(label => ({ title: GROUP_TITLE[label], items: groups.get(label) ?? [] }))
-    .filter(g => g.items.length);
+  for (const symbol of symbols || []) visit(symbol);
+  return result;
 }
 
-// Ліміт довжини рядка для кастомних (user-supplied) патернів — обмежує час бектрекінгу
-// навіть для потенційно ReDoS-вразливого regex, який користувач може вписати в customPatterns.
-const CUSTOM_PATTERN_MAX_LINE_LENGTH = 500;
+// Editor language providers are external extensions: stop waiting if they stall.
+function boundedSymbols(request, signal, timeoutMs = 1500) {
+  return new Promise(resolve => {
+    let done = false;
+    const finish = value => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      signal.removeEventListener('abort', abort);
+      resolve(value);
+    };
+    const abort = () => finish(undefined);
+    const timer = setTimeout(abort, timeoutMs);
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) return abort();
+    Promise.resolve().then(request).then(finish, () => finish(undefined));
+  });
+}
 
 class FunctionListProvider {
-  constructor(extensionUri) {
-    this._debounceTimer = null;
+  constructor(extensionUri, { symbolProvider, parser = parseInWorker } = {}) {
     this._extensionUri = extensionUri;
-    // uri string -> { version, results } — уникає повторного синхронного парсингу
-    // всього файлу при кожному відкритті Quick Pick, якщо документ не змінювався.
+    this._symbolProvider = symbolProvider || (uri => vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', uri));
+    this._parser = parser;
     this._cache = new Map();
-
-    // Той самий колір, яким сам VS Code підсвічує ціль при переході по символу
-    // (Outline, Ctrl+T) — коротка "спалах"-підсвітка рядка, куди перейшли з Navigator.
-    this._revealHighlight = vscode.window.createTextEditorDecorationType({
-      isWholeLine: true,
-      backgroundColor: new vscode.ThemeColor('editor.symbolHighlightBackground'),
-      borderColor: new vscode.ThemeColor('editor.symbolHighlightBorder'),
-      borderWidth: '1px',
-      borderStyle: 'solid',
-    });
-    this._highlightTimer = null;
-  }
-
-  dispose() {
-    if (this._debounceTimer) clearTimeout(this._debounceTimer);
     this._debounceTimer = null;
-    this._cache.clear();
-    if (this._highlightTimer) clearTimeout(this._highlightTimer);
+    this._debounceDocument = null;
+    this._disposed = false;
+    this._picker = null;
     this._highlightTimer = null;
-    this._revealHighlight.dispose();
+    this._highlightEditor = null;
+    this._revealHighlight = vscode.window.createTextEditorDecorationType({
+      isWholeLine: true, backgroundColor: new vscode.ThemeColor('editor.symbolHighlightBackground'),
+      borderColor: new vscode.ThemeColor('editor.symbolHighlightBorder'), borderWidth: '1px', borderStyle: 'solid',
+    });
+    this._listeners = [
+      vscode.workspace.onDidCloseTextDocument(doc => this.invalidate(doc)),
+      vscode.workspace.onDidChangeTextDocument(event => {
+        if (event.contentChanges.length) this.invalidate(event.document);
+      }),
+      vscode.workspace.onDidChangeConfiguration(event => {
+        for (const entry of [...this._cache.values()]) {
+          if (event.affectsConfiguration('editorToolbar.customPatterns', entry.document.uri)) this.invalidate(entry.document);
+        }
+      }),
+      // A newly activated language extension can replace fallback results.
+      vscode.extensions.onDidChange(() => {
+        for (const entry of [...this._cache.values()]) this.invalidate(entry.document);
+      }),
+    ];
   }
 
-  // Коротко підсвічує рядок призначення, щоб було видно, куди саме перейшли —
-  // інакше на повністю згорнутому файлі кожен згорнутий рядок виглядає однаково
-  // (editor.foldBackground теми) і ціль губиться серед них.
-  _flashLine(editor, line) {
-    if (this._highlightTimer) clearTimeout(this._highlightTimer);
-    editor.setDecorations(this._revealHighlight, [new vscode.Range(line, 0, line, 0)]);
-    this._highlightTimer = setTimeout(() => {
-      editor.setDecorations(this._revealHighlight, []);
-      this._highlightTimer = null;
-    }, 700);
+  invalidate(doc) {
+    const key = doc.uri.toString();
+    this._cache.get(key)?.controller.abort();
+    this._cache.delete(key);
+    if (this._debounceDocument === doc) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
+      this._debounceDocument = null;
+    }
+    if (this._picker?.document === doc) {
+      const { qp } = this._picker;
+      this._picker = null;
+      qp.hide();
+    }
   }
 
-  refresh(doc) {
-    if (!doc) return;
-    this._cache.set(doc.uri.toString(), { version: doc.version, results: this._parse(doc) });
-  }
+  refresh(doc) { return doc ? this._getFunctions(doc) : Promise.resolve([]); }
 
-  // `doc` захоплюється в момент події, а не читається з activeTextEditor після таймауту —
-  // інакше можна оновити кеш не того файлу, якщо користувач встиг перемкнути вкладку.
   refreshDebounced(doc) {
-    if (this._debounceTimer) clearTimeout(this._debounceTimer);
-    this._debounceTimer = setTimeout(() => this.refresh(doc), 500);
+    clearTimeout(this._debounceTimer);
+    this._debounceDocument = doc;
+    this._debounceTimer = setTimeout(() => {
+      this._debounceTimer = null;
+      this._debounceDocument = null;
+      if (!this._disposed && !doc.isClosed) void this.refresh(doc);
+    }, 500);
+  }
+
+  _patterns(doc) {
+    const value = vscode.workspace.getConfiguration('editorToolbar', doc.uri).get('customPatterns', []);
+    return Array.isArray(value) ? value.filter(pattern => typeof pattern === 'string' && pattern.length <= 1024).slice(0, 32) : [];
+  }
+
+  _parse(doc) {
+    return this._parser({ text: doc.getText(), languageId: doc.languageId, customPatterns: this._patterns(doc) });
+  }
+
+  async _collect(doc, snapshot, signal) {
+    const symbols = await boundedSymbols(() => this._symbolProvider(doc.uri), signal);
+    if (signal.aborted) return [];
+    const native = flattenSymbols(symbols, doc.uri.toString(), snapshot.languageId, snapshot.text);
+    // An empty symbol list is also returned when there is no provider. Use fallback then.
+    if (native.length && !snapshot.customPatterns.length) return native;
+    let parsed;
+    try {
+      parsed = await this._parser({ ...snapshot, customOnly: native.length > 0 }, { signal });
+    } catch (error) {
+      error.partialResults = native;
+      throw error;
+    }
+    const seen = new Set(native.map(item => `${item.line}:${item.name}`));
+    return [...native, ...parsed.filter(item => !seen.has(`${item.line}:${item.name}`))];
   }
 
   _getFunctions(doc) {
+    if (this._disposed || doc.isClosed) return Promise.resolve([]);
     const key = doc.uri.toString();
-    const cached = this._cache.get(key);
-    if (cached && cached.version === doc.version) return cached.results;
-
-    const results = this._parse(doc);
-    this._cache.set(key, { version: doc.version, results });
-    return results;
+    const patterns = this._patterns(doc);
+    const configKey = JSON.stringify(patterns);
+    const previous = this._cache.get(key);
+    if (previous && previous.document === doc && previous.version === doc.version &&
+        previous.languageId === doc.languageId && previous.configKey === configKey) {
+      this._cache.delete(key);
+      this._cache.set(key, previous);
+      return previous.promise;
+    }
+    this.invalidate(doc);
+    const entry = { document: doc, version: doc.version, languageId: doc.languageId, configKey,
+      controller: new AbortController(), results: [], error: null };
+    const snapshot = { text: doc.getText(), languageId: doc.languageId, customPatterns: patterns };
+    this._cache.set(key, entry);
+    while (this._cache.size > CACHE_LIMIT) {
+      const oldest = this._cache.keys().next().value;
+      this._cache.get(oldest).controller.abort();
+      this._cache.delete(oldest);
+    }
+    entry.promise = this._collect(doc, snapshot, entry.controller.signal).then(results => {
+      if (this._cache.get(key) !== entry || doc.isClosed || doc.version !== entry.version ||
+          doc.languageId !== entry.languageId || entry.controller.signal.aborted) return [];
+      entry.results = results;
+      return results;
+    }).catch(error => {
+      if (error.code !== 'ABORTED' && this._cache.get(key) === entry) {
+        entry.error = error;
+        entry.results = error.partialResults || [];
+        return entry.results;
+      }
+      return [];
+    });
+    return entry.promise;
   }
 
   async showQuickPick() {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return;
-
-    const fns = this._getFunctions(editor.document);
-    if (!fns.length) {
-      vscode.window.showInformationMessage('No functions or procedures found in this file.');
-      return;
-    }
-
-    const kindIcon = {
-      procedure: 'symbol-event',
-      function:  'symbol-function',
-      method:    'symbol-property',
-      custom:    'symbol-key',
-    };
-
-    const bslIcon = {
-      'bsl-procedure': vscode.Uri.joinPath(this._extensionUri, 'images', 'icon-procedure.svg'),
-      'bsl-function':  vscode.Uri.joinPath(this._extensionUri, 'images', 'icon-function.svg'),
-    };
-
+    if (!editor || this._disposed) return;
+    this._picker?.qp.hide();
+    const document = editor.document;
+    const version = document.version;
+    // Start before assigning _picker: cache replacement invalidates the previous picker.
+    const loading = this._getFunctions(document);
     const qp = vscode.window.createQuickPick();
-    qp.placeholder = 'Go to function or procedure…';
+    const picker = { qp, document };
+    this._picker = picker;
+    qp.placeholder = vscode.l10n.t('Go to function or procedure…');
     qp.matchOnDescription = true;
-
-    // Кнопка сортування в заголовку Quick Pick
-    qp.buttons = [{
-      iconPath: new vscode.ThemeIcon('sort-precedence'),
-      tooltip:  'Sort A→Z / by line',
-    }];
-
+    qp.busy = true;
+    qp.buttons = [{ iconPath: new vscode.ThemeIcon('sort-precedence'), tooltip: vscode.l10n.t('Sort A→Z / by line') }];
+    let functions = [];
     let sortedAlpha = false;
-
-    const toItem = (fn) => ({
-      label:       fn.name,
-      description: `${KIND_LABEL[fn.kind] ?? 'Function'} · line ${fn.line + 1}`,
-      iconPath:    bslIcon[fn.kind] ?? new vscode.ThemeIcon(kindIcon[fn.kind] ?? 'symbol-function'),
-      line:        fn.line,
-    });
-
-    const buildItems = (alpha) => {
-      const sorter = alpha ? (a, b) => a.name.localeCompare(b.name) : (a, b) => a.line - b.line;
-      const items = [];
-      for (const group of groupByKindLabel(fns)) {
-        items.push({ kind: vscode.QuickPickItemKind.Separator, label: group.title });
-        items.push(...group.items.slice().sort(sorter).map(toItem));
-      }
-      return items;
-    };
-
-    qp.items = buildItems(false);
-
-    // Клік на кнопку — перемикає сортування
+    const kindIcons = { procedure: 'symbol-event', function: 'symbol-function', method: 'symbol-property', custom: 'symbol-key' };
+    const buildItems = () => groupByKindLabel(functions).flatMap(group => [
+      { kind: vscode.QuickPickItemKind.Separator, label: vscode.l10n.t(group.title) },
+      ...group.items.slice().sort(sortedAlpha ? (a, b) => a.name.localeCompare(b.name) : (a, b) => a.line - b.line)
+        .map(fn => ({ ...fn, label: fn.name,
+          description: `${vscode.l10n.t(KIND_LABEL[fn.kind] || 'Function')} · ${vscode.l10n.t('line {0}', fn.line + 1)}`,
+          iconPath: fn.kind.startsWith('bsl-')
+            ? vscode.Uri.joinPath(this._extensionUri, 'images', fn.kind === 'bsl-procedure' ? 'icon-procedure.svg' : 'icon-function.svg')
+            : new vscode.ThemeIcon(kindIcons[fn.kind] || 'symbol-function'),
+        })),
+    ]);
     qp.onDidTriggerButton(() => {
       sortedAlpha = !sortedAlpha;
-      qp.placeholder = sortedAlpha ? 'Sorted A→Z' : 'Sorted by line';
-      qp.items = buildItems(sortedAlpha);
+      qp.placeholder = vscode.l10n.t(sortedAlpha ? 'Sorted A→Z' : 'Sorted by line');
+      qp.items = buildItems();
     });
-
-    qp.onDidAccept(async () => {
-      const picked = qp.activeItems[0];
+    qp.onDidAccept(() => {
+      const picked = qp.selectedItems[0] || qp.activeItems[0];
+      if (qp.busy || !picked || !Number.isInteger(picked.line)) return;
       qp.hide();
-      if (!picked) return;
-
-      // `editor` було захоплено на момент відкриття Quick Pick — якщо користувач встиг
-      // перемкнути активну вкладку до вибору, застосовуємо результат до того ж документа,
-      // а не до вкладки, що випадково опинилась активною зараз.
-      const pos = new vscode.Position(picked.line, 0);
-      const target = vscode.window.visibleTextEditors.find(e => e.document === editor.document)
-        ?? await vscode.window.showTextDocument(editor.document, { preview: false });
-
-      // Розгортаємо цільову процедуру/функцію — інакше на повністю згорнутому файлі
-      // перехід виглядає так, ніби нічого не сталось (усі рядки виглядають однаково).
-      await vscode.commands.executeCommand('editor.unfold', { selectionLines: [picked.line], levels: 1 });
-
-      target.selection = new vscode.Selection(pos, pos);
-      target.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
-      this._flashLine(target, picked.line);
+      void this._navigate(editor, picked, version).catch(() =>
+        vscode.window.showWarningMessage(vscode.l10n.t('Could not open the selected symbol.')));
     });
-
-    qp.onDidHide(() => qp.dispose());
+    qp.onDidHide(() => {
+      if (this._picker === picker) this._picker = null;
+      qp.dispose();
+    });
     qp.show();
+    functions = await loading;
+    if (this._picker !== picker || document.isClosed || document.version !== version) return;
+    qp.busy = false;
+    const error = this._cache.get(document.uri.toString())?.error;
+    if (error) {
+      vscode.window.showWarningMessage(vscode.l10n.t('Function detection stopped. Check custom patterns or try a smaller file.'));
+    }
+    if (!functions.length) {
+      qp.hide();
+      if (!error) vscode.window.showInformationMessage(vscode.l10n.t('No functions or procedures found in this file.'));
+    } else qp.items = buildItems();
   }
 
-  _parse(doc) {
-    const config = vscode.workspace.getConfiguration('editorToolbar');
-    const custom = (config.get('customPatterns') ?? [])
-      .map(p => { try { return { re: new RegExp(p), kind: 'custom' }; } catch { return null; } })
-      .filter(Boolean);
+  async _navigate(editor, symbol, version) {
+    const doc = editor.document;
+    if (doc.isClosed || doc.version !== version || symbol.line < 0 || symbol.line >= doc.lineCount) return;
+    const target = await vscode.window.showTextDocument(doc, { viewColumn: editor.viewColumn, preview: false, preserveFocus: false });
+    if (doc.version !== version || vscode.window.activeTextEditor !== target) return;
+    const pos = doc.validatePosition(new vscode.Position(symbol.line, symbol.character || 0));
+    target.selection = new vscode.Selection(pos, pos);
+    await vscode.commands.executeCommand('editor.unfold', { selectionLines: [symbol.line], levels: 1 });
+    if (doc.isClosed || doc.version !== version) return;
+    target.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+    this._flashLine(target, symbol.line);
+  }
 
-    const langPatterns = KNOWN_LANGS.has(doc.languageId)
-      ? DEFAULT_PATTERNS.filter(p => p.langs.includes(doc.languageId))
-      : DEFAULT_PATTERNS;
-    const patterns = [...langPatterns, ...custom];
-    const results = [];
-    const seen = new Set();
-
-    for (let i = 0; i < doc.lineCount; i++) {
-      const text = doc.lineAt(i).text;
-      const trimmed = text.trim();
-
-      // Пропускаємо коментарі
-      if (trimmed.startsWith('//') || trimmed.startsWith('#') ||
-          trimmed.startsWith('*')  || trimmed.startsWith('--') ||
-          trimmed.startsWith(';')  || trimmed.startsWith("'")) continue;
-
-      for (const { re, kind } of patterns) {
-        if (kind === 'custom' && text.length > CUSTOM_PATTERN_MAX_LINE_LENGTH) continue;
-
-        const m = re.exec(text);
-        if (m) {
-          const name = m[1];
-          if (name && name.length > 1 && !SKIP.has(name)) {
-            const key = `${name}:${i}`;
-            if (!seen.has(key)) {
-              seen.add(key);
-              results.push({ name, line: i, kind });
-            }
-          }
-          break;
-        }
-      }
+  _clearHighlight() {
+    clearTimeout(this._highlightTimer);
+    this._highlightTimer = null;
+    if (this._highlightEditor && !this._highlightEditor.document.isClosed) {
+      this._highlightEditor.setDecorations(this._revealHighlight, []);
     }
-    return results;
+    this._highlightEditor = null;
+  }
+
+  _flashLine(editor, line) {
+    this._clearHighlight();
+    this._highlightEditor = editor;
+    editor.setDecorations(this._revealHighlight, [new vscode.Range(line, 0, line, 0)]);
+    this._highlightTimer = setTimeout(() => this._clearHighlight(), 700);
+  }
+
+  dispose() {
+    this._disposed = true;
+    for (const listener of this._listeners) listener.dispose();
+    clearTimeout(this._debounceTimer);
+    this._debounceTimer = null;
+    this._debounceDocument = null;
+    for (const entry of this._cache.values()) entry.controller.abort();
+    this._cache.clear();
+    this._picker?.qp.hide();
+    this._clearHighlight();
+    this._revealHighlight.dispose();
   }
 }
 
-module.exports = { FunctionListProvider, groupByKindLabel };
+module.exports = { FunctionListProvider, groupByKindLabel, flattenSymbols };

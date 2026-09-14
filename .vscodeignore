@@ -4,3 +4,7 @@ node_modules/**
 test/**
 .gitignore
 *.vsix
+.github/**
+.DS_Store
+scripts/**
+package-lock.json
