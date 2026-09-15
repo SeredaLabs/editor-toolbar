@@ -12,8 +12,8 @@ Editor Toolbar adds a compact status bar and editor-title actions to VS Code.
 Mark the code you want to revisit, jump straight to a function, and format,
 comment, or fold a document without leaving the editor.
 
-**[🇺🇦 Українською](README.uk.md)** · [Command reference](docs/commands.md) ·
-[Settings & language support](docs/settings.md) · [Contributing](CONTRIBUTING.md)
+[🇺🇦 Українською](README.uk.md) · [📖 Command reference](docs/commands.md) ·
+[⚙️ Settings & language support](docs/settings.md) · [🤝 Contributing](CONTRIBUTING.md)
 
 ## 🎬 Demo
 
