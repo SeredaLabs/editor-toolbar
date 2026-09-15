@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2 — README polish
+
+- Even out the top nav-link styling in README.md/README.uk.md: the language
+  switcher was bold with a flag emoji while the other links were plain — all
+  four are now the same weight, each with a small leading icon.
+
 ## 1.3.1 — Recorded demo
 
 - Separate the toolbar actions from neighboring status-bar items with a single
