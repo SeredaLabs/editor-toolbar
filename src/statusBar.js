@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 
 const ITEMS = [
+  { id: 'groupStart', text: '│', label: 'Editor Toolbar', separator: true },
   { icon: 'bookmark', title: 'Toggle Bookmark', cmd: 'editorToolbar.addBookmark' },
   { icon: 'arrow-small-up', title: 'Previous Bookmark', cmd: 'editorToolbar.prevBookmark' },
   { icon: 'arrow-small-down', title: 'Next Bookmark', cmd: 'editorToolbar.nextBookmark' },
@@ -21,13 +22,15 @@ class StatusBar {
   show() {
     if (this._items.length) return;
     for (const [index, def] of ITEMS.entries()) {
-      const item = vscode.window.createStatusBarItem(`editorToolbar.${def.cmd}`, vscode.StatusBarAlignment.Left, -1100 - index);
-      item.text = `$(${def.icon})`;
-      item.name = vscode.l10n.t(def.title);
+      const item = vscode.window.createStatusBarItem(`editorToolbar.${def.cmd || def.id}`, vscode.StatusBarAlignment.Left, -1100 - index);
+      item.text = def.text || `$(${def.icon})`;
+      item.name = def.label || vscode.l10n.t(def.title);
       // Shortcuts can be rebound and differ by OS; the Keyboard Shortcuts editor owns their display.
-      item.tooltip = item.name;
-      item.accessibilityInformation = { label: item.name };
-      item.command = def.cmd;
+      item.tooltip = def.cmd ? `Editor Toolbar · ${item.name}` : undefined;
+      item.accessibilityInformation = { label: item.name, ...(def.separator ? { role: 'separator' } : {}) };
+      // The non-interactive separator shares the controls' visibility and lifecycle.
+      // Keep native theme colors so the group also works in light/high-contrast themes.
+      if (def.cmd) item.command = def.cmd;
       this._items.push(item);
     }
     this._updateVisibility();

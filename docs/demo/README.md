@@ -1,9 +1,17 @@
 # Demo walkthrough and recording guide
 
-[← Overview](../../README.md) · [Українською](../../README.uk.md)
+[← Overview](../../README.md) · [🇺🇦 Українською](../../README.uk.md)
 
 Use [order-service.js](order-service.js) to explore the extension without touching
 your own application code. The walkthrough is also a text alternative to a feature recording.
+
+[Watch the video](../../images/editor-toolbar-demo.mp4) ·
+[View the looping GIF](../../images/editor-toolbar-demo.gif)
+
+The current recording shows Editor Toolbar **1.3.0** in VS Code **1.85.0** on macOS:
+14 scenes, about 56 seconds, English captions, no audio. The MP4 is 1280 × 814
+(a 1280 × 720 workbench plus captions); the GIF is a shorter sequence of captured states.
+The MP4 stays in the repository and is excluded from the VSIX to keep installation small.
 
 ## Walkthrough
 
@@ -23,6 +31,47 @@ The extension's default keybindings are listed in the [command reference](../com
 Use buttons when recording on a keyboard where macOS intercepts function keys.
 
 ## Capture an actual screen recording
+
+### Automated recording
+
+The recorder opens a real VS Code development window with the current extension,
+clicks its toolbar controls, and records the workbench continuously. It uses a
+temporary profile and a copy of the sample; it does not change your editor settings.
+Keep GUI test runs separate from recording runs.
+
+Install the tools once (Node.js 22+, Python 3.10+):
+
+```sh
+npm ci
+npx playwright-core install ffmpeg
+python3 -m venv .vscode-test/demo-tools
+.vscode-test/demo-tools/bin/python -m pip install Pillow imageio-ffmpeg
+```
+
+On Windows, use `.vscode-test/demo-tools/Scripts/python.exe` for the Python commands.
+
+Record to a **new directory** outside the repository, then export:
+
+```sh
+npm run demo:record -- /absolute/path/to/new-capture
+.vscode-test/demo-tools/bin/python scripts/build-demo.py \
+  /absolute/path/to/new-capture/manifest.json images/editor-toolbar-demo.gif \
+  --video-capture /absolute/path/to/new-capture/capture.json
+```
+
+This produces a continuous H.264 MP4 with English captions, a looping GIF of
+captured feature states, and a PNG poster. The GIF is a condensed walkthrough;
+the MP4 preserves the interactions and typing. Neither redraws the workbench.
+Both have a caption strip below the captured UI and no audio.
+
+The recorder defaults to VS Code 1.85.0. `VSCODE_TEST_VERSION` and
+`VSCODE_EXECUTABLE_PATH` work as in the integration test runner. It needs a GUI
+desktop that can fit a 1280 × 720 content area. Captures include the extension
+version, timings, raw WebM, and PNG frames. A failed run keeps diagnostics in
+the capture directory and returns a nonzero exit code. Review every scene and
+the start/end of the exported MP4 before replacing the published assets.
+
+### Manual recording
 
 - Use a separate VS Code user-data directory and extension directory. Load the current
   source as the development extension and copy the sample file into a temporary workspace.

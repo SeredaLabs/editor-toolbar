@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Separate the toolbar actions from neighboring status-bar items with a single
+  vertical divider on the left. The divider hides with the controls when no text
+  editor is active.
+- Add a real VS Code demo recording, looping GIF, and a repeatable recording/export workflow.
+
 ## 1.3.0 — Reliability and navigation
 
 - Bookmarks track edits in active and background documents, remove anchors consumed

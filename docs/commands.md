@@ -1,6 +1,6 @@
 # Command reference
 
-[← Overview](../README.md) · [Українською](../README.uk.md)
+[← Overview](../README.md) · [🇺🇦 Українською](../README.uk.md)
 
 Open the **Command Palette** and search for **Editor Toolbar** to find the extension's
 commands. Formatting and commenting are VS Code built-in commands exposed by the

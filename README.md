@@ -12,18 +12,22 @@ Editor Toolbar adds a compact status bar and editor-title actions to VS Code.
 Mark the code you want to revisit, jump straight to a function, and format,
 comment, or fold a document without leaving the editor.
 
-**[Українською](README.uk.md)** · [Command reference](docs/commands.md) ·
+**[🇺🇦 Українською](README.uk.md)** · [Command reference](docs/commands.md) ·
 [Settings & language support](docs/settings.md) · [Contributing](CONTRIBUTING.md)
 
 ## 🎬 Demo
 
-<!-- Generated automatically by `python3 scripts/build-demo.py` once a real screen
-     recording is captured — see docs/demo/README.md. Not shown until that file exists. -->
 <p align="center">
-  <img src="images/editor-toolbar-demo.gif" alt="Editor Toolbar demo: bookmarking, jumping between functions, and folding a file" width="720">
+  <a href="images/editor-toolbar-demo.mp4">
+    <img src="images/editor-toolbar-demo.gif" alt="Editor Toolbar demo: bookmarking, jumping between functions, and folding a file" width="720">
+  </a>
 </p>
 
-*(Recording pending — follow the [demo walkthrough](docs/demo/README.md) to capture and generate it.)*
+[Watch the full video (MP4)](images/editor-toolbar-demo.mp4) ·
+[Walkthrough and recording instructions](docs/demo/README.md)
+
+Recorded in a real VS Code window with Editor Toolbar 1.3.0. The looping GIF shows
+selected feature states; the video includes the full interactions, with captions and no audio.
 
 ## 🧭 What you can do
 
@@ -46,7 +50,8 @@ Requires **VS Code 1.85.0 or newer**.
 2. In VS Code, open **Extensions** and its **…** menu.
 3. Choose **Install from VSIX…**, select the file, and open a text document.
 
-The status bar shows bookmark, format, comment, and settings buttons.
+The status bar shows bookmark, format, comment, and settings buttons,
+separated from neighboring items by a single vertical divider on the left.
 The editor title bar shows the function navigator and fold/unfold buttons.
 The status bar controls hide when no text editor is active.
 
