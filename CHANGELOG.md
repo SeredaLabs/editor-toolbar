@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.1 — Recorded demo
 
 - Separate the toolbar actions from neighboring status-bar items with a single
   vertical divider on the left. The divider hides with the controls when no text
